@@ -3,219 +3,309 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Club League History</title>
+    <title>Football Club History Tracker</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Load Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+        /* Custom styles to ensure the chart is responsive and the y-axis is inverted */
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            max-width: 800px;
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-50 font-sans p-4 md:p-8">
 
-    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-2xl w-full">
-        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Club League History</h1>
-        <p class="text-gray-600 mb-6 text-center">Select a club from the dropdown to view their league history.</p>
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-indigo-700 mb-2">Club Performance Tracker</h1>
+            <p class="text-gray-600">Analyze the chronological history and ranking of your favorite club.</p>
+        </header>
 
-        <!-- Club selection dropdown -->
-        <div class="mb-8">
-            <label for="club-select" class="block text-gray-700 font-semibold mb-2">Select a Club:</label>
-            <select id="club-select" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200">
+        <!-- Club Selection Dropdown -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <label for="club-select" class="block text-xl font-semibold text-gray-800 mb-3">Select a Club:</label>
+            <select id="club-select" class="w-full md:w-1/2 p-3 border border-indigo-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
                 <option value="" disabled selected>-- Choose a Club --</option>
             </select>
         </div>
 
-        <!-- Results area -->
-        <div id="results-container" class="space-y-4">
-            <!-- Chart will be populated here by JavaScript -->
-            <div class="bg-gray-50 p-6 rounded-xl shadow-inner">
-                <h2 id="chart-title" class="text-2xl font-semibold text-gray-800 mb-4 text-center"></h2>
-                <canvas id="ranking-chart"></canvas>
+        <!-- Main Content Area (History Table and Chart) -->
+        <div id="content-area" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                <!-- Club History Table -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Chronological History</h2>
+                    <div id="history-table-container" class="overflow-x-auto">
+                        <!-- Table will be rendered here -->
+                        <table id="history-table" class="min-w-full divide-y divide-gray-200">
+                            <!-- Table header and body content added by JavaScript -->
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Ranking Chart -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex flex-col items-center">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2 w-full">Ranking Over Time (Past 25 Years)</h2>
+                    <div class="chart-container">
+                        <canvas id="ranking-chart"></canvas>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-4">Lower position numbers (closer to 1) indicate a better ranking, hence the inverted Y-axis.</p>
+                </div>
             </div>
         </div>
+        
+        <!-- Initial Message / Loading Indicator -->
+        <div id="initial-message" class="text-center text-gray-500 p-10 bg-white rounded-xl shadow-lg">
+            <p class="text-lg">Please select a club from the dropdown above to view its history and ranking chart.</p>
+        </div>
+        <div id="error-message" class="hidden text-center text-red-600 p-4 bg-red-100 rounded-xl shadow-lg mt-4">
+            <p class="font-semibold">Error loading data. Please ensure 'club_data.json' is available.</p>
+        </div>
+
     </div>
 
     <script>
-        // Use a self-invoking async function to handle all the logic
-        (async function() {
-            // Mock data representing a database schema
-            const clubs = [
-                { club_id: 1, current_name: "Real Madrid" },
-                { club_id: 2, current_name: "FC Barcelona" },
-                { club_id: 3, current_name: "Atlético Madrid" },
-                { club_id: 4, current_name: "Girona FC" },
-                { club_id: 5, current_name: "Sevilla FC" }
-            ];
+        // Global variables
+        let clubData = {};
+        let rankingChartInstance = null;
+        const CHART_YEAR_RANGE = 25; // Define the range for the chart
 
-            const standings = [
-                // Tier 1 (La Liga)
-                { season_id: 1, club_id: 1, final_position: 1 },
-                { season_id: 1, club_id: 2, final_position: 2 },
-                { season_id: 1, club_id: 3, final_position: 3 },
-                { season_id: 1, club_id: 4, final_position: 4 },
-                { season_id: 1, club_id: 5, final_position: 5 },
-                { season_id: 2, club_id: 1, final_position: 1 },
-                { season_id: 2, club_id: 2, final_position: 3 },
-                { season_id: 2, club_id: 3, final_position: 2 },
-                { season_id: 2, club_id: 4, final_position: 4 },
-                { season_id: 2, club_id: 5, final_position: 5 },
-                // Tier 2 (Segunda División)
-                { season_id: 3, club_id: 1, final_position: 1 },
-                { season_id: 3, club_id: 2, final_position: 2 },
-                { season_id: 3, club_id: 3, final_position: 3 },
-                { season_id: 3, club_id: 4, final_position: 4 },
-                { season_id: 3, club_id: 5, final_position: 5 },
-            ];
+        const clubSelect = document.getElementById('club-select');
+        const contentArea = document.getElementById('content-area');
+        const initialMessage = document.getElementById('initial-message');
+        const errorMessage = document.getElementById('error-message');
+        const historyTableContainer = document.getElementById('history-table-container');
 
-            const seasons = [
-                { season_id: 1, division_id: 1, year: 2023 },
-                { season_id: 2, division_id: 1, year: 2024 },
-                { season_id: 3, division_id: 2, year: 2025 }
-            ];
+        // Function to fetch the JSON data
+        async function fetchClubData() {
+            try {
+                // Fetch the locally defined JSON file
+                const response = await fetch('club_data.json'); 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                clubData = await response.json();
+                populateDropdown(clubData);
+                errorMessage.classList.add('hidden');
+            } catch (error) {
+                console.error("Could not fetch club data:", error);
+                errorMessage.classList.remove('hidden');
+            }
+        }
 
-            const divisions = [
-                { division_id: 1, tier_id: 1, division_name: "Single Division" },
-                { division_id: 2, tier_id: 2, division_name: "Single Division" }
-            ];
-            
-            const tiers = [
-                { tier_id: 1, league_id: 1, tier_name: "Tier 1", position_offset: 0 },
-                { tier_id: 2, league_id: 1, tier_name: "Tier 2", position_offset: 10 }
-            ];
-
-            const leagues = [
-                { league_id: 1, current_name: "La Liga", country: "Spain" }
-            ];
-
-            // Global variable for the chart instance
-            let myChart = null;
-
-            // Get references to DOM elements
-            const clubSelect = document.getElementById('club-select');
-            const chartTitle = document.getElementById('chart-title');
-            const canvas = document.getElementById('ranking-chart');
-            const ctx = canvas.getContext('2d');
-
-            // Populate the dropdown with clubs
-            clubs.forEach(club => {
+        // Function to populate the dropdown
+        function populateDropdown(data) {
+            const clubNames = Object.keys(data).sort();
+            clubNames.forEach(clubName => {
                 const option = document.createElement('option');
-                option.value = club.club_id;
-                option.textContent = club.current_name;
+                option.value = clubName;
+                option.textContent = clubName;
                 clubSelect.appendChild(option);
             });
+            // Show the dropdown if data loaded successfully
+            clubSelect.disabled = false;
+        }
 
-            // Function to create and update the chart
-            const createChart = (clubName, data) => {
-                if (myChart) {
-                    myChart.destroy();
-                }
+        // Function to handle club selection and display data
+        function handleClubSelection(event) {
+            const clubName = event.target.value;
+            if (!clubName) return;
 
-                // Sort data by year
-                data.sort((a, b) => a.year - b.year);
+            // Hide initial message and show content area
+            initialMessage.classList.add('hidden');
+            contentArea.classList.remove('hidden');
 
-                const years = data.map(item => item.year);
-                const positions = data.map(item => item.overallPosition);
+            const history = clubData[clubName] || [];
+            
+            displayHistoryTable(history);
+            displayRankingChart(history, clubName);
+        }
 
-                chartTitle.textContent = `Overall Ranking for ${clubName}`;
+        // Function to display the chronological history table
+        function displayHistoryTable(history) {
+            const table = document.getElementById('history-table');
+            // Clear previous content
+            historyTableContainer.innerHTML = '';
+            
+            if (history.length === 0) {
+                historyTableContainer.innerHTML = '<p class="text-center text-gray-500 py-4">No history data available for this club.</p>';
+                return;
+            }
 
-                myChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: years,
-                        datasets: [{
-                            label: 'Overall Rank',
-                            data: positions,
-                            borderColor: 'rgb(59, 130, 246)',
-                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                            tension: 0.3,
-                            fill: true,
-                        }]
+            // Create table structure
+            const tableHTML = `
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tier</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">League</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            `;
+            historyTableContainer.innerHTML = tableHTML;
+            const tbody = document.getElementById('history-body');
+
+            // Sort history chronologically (ascending year)
+            const sortedHistory = [...history].sort((a, b) => a.Year - b.Year);
+
+            // Populate table rows
+            sortedHistory.forEach(record => {
+                const tierColor = getTierColor(record.Tier);
+                const row = document.createElement('tr');
+                row.classList.add('hover:bg-indigo-50');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${record.Year}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${tierColor}">Tier ${record.Tier}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.League}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">${record.Position}${getOrdinal(record.Position)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Helper function for styling tiers
+        function getTierColor(tier) {
+            switch (tier) {
+                case 1: return 'bg-yellow-100 text-yellow-800';
+                case 2: return 'bg-blue-100 text-blue-800';
+                case 3: return 'bg-green-100 text-green-800';
+                case 4: return 'bg-red-100 text-red-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        // Helper function for ordinal suffix
+        function getOrdinal(n) {
+            if (n > 3 && n < 21) return 'th';
+            switch (n % 10) {
+                case 1: return "st";
+                case 2: return "nd";
+                case 3: return "rd";
+                default: return "th";
+            }
+        }
+
+
+        // Function to display the ranking chart
+        function displayRankingChart(history, clubName) {
+            const canvas = document.getElementById('ranking-chart');
+            
+            // Filter history for the last 25 years (or all if less)
+            const currentYear = new Date().getFullYear();
+            const startYear = currentYear - CHART_YEAR_RANGE;
+            
+            const relevantHistory = [...history]
+                .filter(r => r.Year >= startYear)
+                .sort((a, b) => a.Year - b.Year);
+                
+            // Extract labels (Years) and data (Positions)
+            const labels = relevantHistory.map(r => r.Year);
+            const data = relevantHistory.map(r => r.Position);
+            
+            // Find the worst (highest number) position to set the Y-axis scale
+            // If the data is empty, default max position to 12 (based on CSV snippet)
+            const maxPosition = data.length > 0 ? Math.max(...data) : 12;
+
+            // Destroy previous chart instance if it exists
+            if (rankingChartInstance) {
+                rankingChartInstance.destroy();
+            }
+
+            rankingChartInstance = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `${clubName} Final Position`,
+                        data: data,
+                        borderColor: '#4f46e5', // Indigo-600
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        tension: 0.3, // Curve the line slightly
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Allows chart-container height to take effect
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        title: {
+                            display: false,
+                        }
                     },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                display: false
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Season Year'
                             },
-                            tooltip: {
-                                callbacks: {
-                                    title: (tooltipItems) => {
-                                        const tooltipItem = tooltipItems[0];
-                                        return `Year: ${tooltipItem.label}`;
-                                    },
-                                    label: (context) => {
-                                        const dataPoint = data[context.dataIndex];
-                                        return `Rank: ${dataPoint.overallPosition} (${dataPoint.tierName})`;
-                                    }
-                                }
+                            ticks: {
+                                // Only show ticks for years where data exists
+                                autoSkip: true,
+                                maxTicksLimit: 15
                             }
                         },
-                        scales: {
-                            y: {
-                                reverse: true,
-                                beginAtZero: false,
-                                title: {
-                                    display: true,
-                                    text: 'Overall Rank'
-                                },
-                                ticks: {
-                                    stepSize: 1
+                        y: {
+                            // Invert the Y-axis so Position 1 is at the top (best performance)
+                            reverse: true,
+                            min: 1, // Minimum position is 1st
+                            max: maxPosition + 1, // Set maximum slightly higher than the worst recorded position
+                            ticks: {
+                                stepSize: 1,
+                                precision: 0,
+                                callback: function(value, index, ticks) {
+                                    // Ensure only integer positions are shown
+                                    if (Math.floor(value) === value) {
+                                        return value;
+                                    }
                                 }
                             },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Year'
-                                }
+                            title: {
+                                display: true,
+                                text: 'League Position (Lower is Better)'
+                            }
+                        }
+                    },
+                    tooltip: {
+                         callbacks: {
+                            title: function(context) {
+                                return `Season: ${context[0].label}`;
+                            },
+                            label: function(context) {
+                                const position = context.parsed.y;
+                                return `Final Position: ${position}${getOrdinal(position)}`;
                             }
                         }
                     }
-                });
-            };
-
-            // Event listener for dropdown selection
-            clubSelect.addEventListener('change', (e) => {
-                const selectedClubId = parseInt(e.target.value);
-                const clubName = clubs.find(c => c.club_id === selectedClubId)?.current_name || 'N/A';
-
-                // Filter standings for the selected club
-                const clubStandings = standings.filter(s => s.club_id === selectedClubId);
-
-                if (clubStandings.length === 0) {
-                    chartTitle.textContent = `No league history found for ${clubName}.`;
-                    if (myChart) myChart.destroy();
-                    return;
                 }
-
-                // Gather and process data for the chart
-                const clubHistory = clubStandings.map(standing => {
-                    const season = seasons.find(s => s.season_id === standing.season_id);
-                    if (!season) return null;
-                    
-                    const division = divisions.find(d => d.division_id === season.division_id);
-                    if (!division) return null;
-
-                    const tier = tiers.find(t => t.tier_id === division.tier_id);
-                    if (!tier) return null;
-                    
-                    // Calculate an overall position based on tier and final position
-                    const overallPosition = tier.position_offset + standing.final_position;
-
-                    return {
-                        year: season.year,
-                        overallPosition: overallPosition,
-                        tierName: tier.tier_name
-                    };
-                }).filter(Boolean);
-
-                // Create and display the chart
-                createChart(clubName, clubHistory);
             });
+        }
 
-        })();
+        // Event listener for dropdown change
+        clubSelect.addEventListener('change', handleClubSelection);
+
+        // Initialize the application
+        fetchClubData();
+
     </script>
 </body>
 </html>
