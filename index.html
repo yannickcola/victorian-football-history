@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Club League History</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-2xl w-full">
+        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Club League History</h1>
+        <p class="text-gray-600 mb-6 text-center">Select a club from the dropdown to view their league history.</p>
+
+        <!-- Club selection dropdown -->
+        <div class="mb-8">
+            <label for="club-select" class="block text-gray-700 font-semibold mb-2">Select a Club:</label>
+            <select id="club-select" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200">
+                <option value="" disabled selected>-- Choose a Club --</option>
+            </select>
+        </div>
+
+        <!-- Results area -->
+        <div id="results-container" class="space-y-4">
+            <!-- Chart will be populated here by JavaScript -->
+            <div class="bg-gray-50 p-6 rounded-xl shadow-inner">
+                <h2 id="chart-title" class="text-2xl font-semibold text-gray-800 mb-4 text-center"></h2>
+                <canvas id="ranking-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use a self-invoking async function to handle all the logic
+        (async function() {
+            // Mock data representing a database schema
+            const clubs = [
+                { club_id: 1, current_name: "Real Madrid" },
+                { club_id: 2, current_name: "FC Barcelona" },
+                { club_id: 3, current_name: "Atlético Madrid" },
+                { club_id: 4, current_name: "Girona FC" },
+                { club_id: 5, current_name: "Sevilla FC" }
+            ];
+
+            const standings = [
+                // Tier 1 (La Liga)
+                { season_id: 1, club_id: 1, final_position: 1 },
+                { season_id: 1, club_id: 2, final_position: 2 },
+                { season_id: 1, club_id: 3, final_position: 3 },
+                { season_id: 1, club_id: 4, final_position: 4 },
+                { season_id: 1, club_id: 5, final_position: 5 },
+                { season_id: 2, club_id: 1, final_position: 1 },
+                { season_id: 2, club_id: 2, final_position: 3 },
+                { season_id: 2, club_id: 3, final_position: 2 },
+                { season_id: 2, club_id: 4, final_position: 4 },
+                { season_id: 2, club_id: 5, final_position: 5 },
+                // Tier 2 (Segunda División)
+                { season_id: 3, club_id: 1, final_position: 1 },
+                { season_id: 3, club_id: 2, final_position: 2 },
+                { season_id: 3, club_id: 3, final_position: 3 },
+                { season_id: 3, club_id: 4, final_position: 4 },
+                { season_id: 3, club_id: 5, final_position: 5 },
+            ];
+
+            const seasons = [
+                { season_id: 1, division_id: 1, year: 2023 },
+                { season_id: 2, division_id: 1, year: 2024 },
+                { season_id: 3, division_id: 2, year: 2025 }
+            ];
+
+            const divisions = [
+                { division_id: 1, tier_id: 1, division_name: "Single Division" },
+                { division_id: 2, tier_id: 2, division_name: "Single Division" }
+            ];
+            
+            const tiers = [
+                { tier_id: 1, league_id: 1, tier_name: "Tier 1", position_offset: 0 },
+                { tier_id: 2, league_id: 1, tier_name: "Tier 2", position_offset: 10 }
+            ];
+
+            const leagues = [
+                { league_id: 1, current_name: "La Liga", country: "Spain" }
+            ];
+
+            // Global variable for the chart instance
+            let myChart = null;
+
+            // Get references to DOM elements
+            const clubSelect = document.getElementById('club-select');
+            const chartTitle = document.getElementById('chart-title');
+            const canvas = document.getElementById('ranking-chart');
+            const ctx = canvas.getContext('2d');
+
+            // Populate the dropdown with clubs
+            clubs.forEach(club => {
+                const option = document.createElement('option');
+                option.value = club.club_id;
+                option.textContent = club.current_name;
+                clubSelect.appendChild(option);
+            });
+
+            // Function to create and update the chart
+            const createChart = (clubName, data) => {
+                if (myChart) {
+                    myChart.destroy();
+                }
+
+                // Sort data by year
+                data.sort((a, b) => a.year - b.year);
+
+                const years = data.map(item => item.year);
+                const positions = data.map(item => item.overallPosition);
+
+                chartTitle.textContent = `Overall Ranking for ${clubName}`;
+
+                myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: years,
+                        datasets: [{
+                            label: 'Overall Rank',
+                            data: positions,
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            tension: 0.3,
+                            fill: true,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: (tooltipItems) => {
+                                        const tooltipItem = tooltipItems[0];
+                                        return `Year: ${tooltipItem.label}`;
+                                    },
+                                    label: (context) => {
+                                        const dataPoint = data[context.dataIndex];
+                                        return `Rank: ${dataPoint.overallPosition} (${dataPoint.tierName})`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                reverse: true,
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Overall Rank'
+                                },
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Year'
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            // Event listener for dropdown selection
+            clubSelect.addEventListener('change', (e) => {
+                const selectedClubId = parseInt(e.target.value);
+                const clubName = clubs.find(c => c.club_id === selectedClubId)?.current_name || 'N/A';
+
+                // Filter standings for the selected club
+                const clubStandings = standings.filter(s => s.club_id === selectedClubId);
+
+                if (clubStandings.length === 0) {
+                    chartTitle.textContent = `No league history found for ${clubName}.`;
+                    if (myChart) myChart.destroy();
+                    return;
+                }
+
+                // Gather and process data for the chart
+                const clubHistory = clubStandings.map(standing => {
+                    const season = seasons.find(s => s.season_id === standing.season_id);
+                    if (!season) return null;
+                    
+                    const division = divisions.find(d => d.division_id === season.division_id);
+                    if (!division) return null;
+
+                    const tier = tiers.find(t => t.tier_id === division.tier_id);
+                    if (!tier) return null;
+                    
+                    // Calculate an overall position based on tier and final position
+                    const overallPosition = tier.position_offset + standing.final_position;
+
+                    return {
+                        year: season.year,
+                        overallPosition: overallPosition,
+                        tierName: tier.tier_name
+                    };
+                }).filter(Boolean);
+
+                // Create and display the chart
+                createChart(clubName, clubHistory);
+            });
+
+        })();
+    </script>
+</body>
+</html>
